@@ -1,0 +1,154 @@
+CREATE table PD_Milestone( 
+S_NO NUMBER(5),
+MID NUMBER(5) PRIMARY KEY,
+PID NUMBER(5) NOT NULL,
+Milestone_Name varchar2(50) NOT NULL, 
+Milestone_Date DATE NOT NULL, 
+Payment_Date DATE NOT NULL,
+FOREIGN KEY (PID) REFERENCES PD_PROJECT(PID)
+);
+
+====================================================================================================
+Declare
+v_Result Boolean := False;
+
+Function Authenticate_User(p_User_Name Varchar2
+                            ,p_Password  Varchar2) Return Boolean As
+     v_Password pd_login.Password%Type;
+     v_Email    pd_login.Email%Type;
+  Begin
+     If :P101_USERNAME Is Null Or :P101_PASSWORD Is Null Then
+  
+        -- Write to Session, Notification must enter a username and password
+        Apex_Util.Set_Session_State('LOGIN_MESSAGE'
+                                   ,'Please enter Username and Password or Use Username and Password as guest for Guest login');
+        Return False;
+     End If;
+     ----
+     Begin
+        Select u.Password
+              ,u.Email
+        Into   v_Password
+              ,v_Email
+        From   PD_LOGIN u
+        Where  u.userid = :P101_USERNAME;
+     Exception
+        When No_Data_Found Then
+      
+           -- Write to Session, User not found.
+           Apex_Util.Set_Session_State('LOGIN_MESSAGE'
+                                      ,'User not found. Please enter guest as Username and Password if you are Guest User');
+           Return False;
+     End;
+     If v_Password <> p_Password Then
+    
+        -- Write to Session, Password incorrect.
+        Apex_Util.Set_Session_State('LOGIN_MESSAGE'
+                                   ,'Password incorrect');
+        Return False;
+     End If;
+     ---
+     -- Write user information to Session.
+     --
+     Apex_Util.Set_Session_State('SESSION_USER_NAME'
+                                ,:P101_USERNAME);
+     Apex_Util.Set_Session_State('SESSION_EMAIL'
+                                ,v_Email);
+     Apex_Util.Set_Session_State('SESSION_USERID'
+                                ,:P101_USERNAME);     
+          Apex_Util.Set_Session_State('SESSION_ID'
+                                ,'&SESSION.');
+     ---
+     ---
+     Return True;
+  End;
+
+Begin
+     v_Result := Authenticate_User(:P101_USERNAME
+                                  ,:P101_PASSWORD);
+     If v_Result = True Then
+        -- Redirect to Page 1 (Home Page).
+        Wwv_Flow_Custom_Auth_Std.Post_Login(:P101_USERNAME -- p_User_Name
+                                           ,:P101_PASSWORD -- p_Password
+                                           ,v('APP_SESSION') -- p_Session_Id
+                                           ,:APP_ID || ':1' -- p_Flow_page
+                                            );
+     Else
+        -- Login Failure, redirect to page 101 (Login Page).
+        Owa_Util.Redirect_Url('f?p=&APP_ID.:101:&SESSION.');
+     End If;
+  End;
+  =========================================================================================================
+.t-Login-header{
+    padding-top: 0px;
+}
+span.t-Login-logo{
+    background : url(#APP_IMAGES#css/images/devil-icon.png);
+    background-size: cover;
+    width: 140px;
+    height: 140px;
+}
+.t-Login-title{
+    margin: 0px;
+}
+
+.t-PageBody--login .t-Body{
+    background : url(#APP_IMAGES#css/images/background.jpg);
+    background-repeat:no-repeat;
+    background-size:cover;
+}
+
+.t-Region {
+    padding-top : 4px;
+}
+
+.t-Login-body{    
+    padding-bottom: 20px;
+}
+==========================================================================================================
+declare
+v_Result Boolean := False;
+
+Function Change_password(p_Password  Varchar2) Return Boolean As
+     v_Password pd_login.Password%Type;
+     v_Confirm_Password    pd_login.Password%Type;
+  Begin
+     If :P9_OLD_PASSWORD Is Null Or :P9_NEW_PASSWORD Is Null Or :P9_CONFIRM_NEW_PASSWORD Is Null Then
+        Apex_Util.Set_Session_State('CHANGE_PASSWORD'
+                                   ,'<span style="color:red">Please fill all text fields</span>');
+        Return False;
+     End If;
+     ----
+     Begin
+        Select u.Password
+        Into   v_Password
+        From   PD_LOGIN u
+        Where  u.userid = '&SESSION_USERID.';
+        IF v_Password != :P9_OLD_PASSWORD THEN
+        Apex_Util.Set_Session_State('CHANGE_PASSWORD','<span style="color:red">Incorrect Old Password</span>');
+        Return False;
+        End If;
+     End;
+     If v_Password = :P9_OLD_PASSWORD AND :P9_NEW_PASSWORD = :P9_CONFIRM_NEW_PASSWORD Then
+        update PD_LOGIN u set PASSWORD = :P9_NEW_PASSWORD where u.userid = '&SESSION_USERID.';
+        Return True;
+     Else
+          Apex_Util.Set_Session_State('CHANGE_PASSWORD'
+                                   ,'<span style="color:red">New Password Mismatch</span>');
+     Return False;        
+     End If;
+  End;
+
+Begin
+     v_Result := Change_Password(:P9_OLD_PASSWORD);
+     If v_Result = True Then
+        -- Redirect to Page 1 (Home Page).
+        Apex_Util.Set_Session_State('SUCCESS_MESSAGE','TRUE');
+        Apex_Util.Set_Session_State('CHANGE_PASSWORD','<span style="color:green">Successfully Changed Password</span>');
+        apex_application.g_print_success_message := 'Successfully Changed Password';
+     Else
+        --Failure, redirect to page 9 (Login Page).
+        Apex_Util.Set_Session_State('SUCCESS_MESSAGE','FALSE');
+     End If;
+  End;
+===============================================================================================================
